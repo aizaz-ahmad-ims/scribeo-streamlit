@@ -23,7 +23,7 @@ def get_groq_client():
 
 client = get_groq_client()
 
-system_prompt = """You are a medical scribe assistant and medical coder.
+system_prompt = """You are a medical scribe assistant.
 Convert a doctor-patient transcript into a structured SOAP note.
 Rules:
 - Output ONLY the SOAP note.
@@ -40,45 +40,19 @@ PLAN: ..."""
 def parse_soap(text):
     sections = {"S": "", "O": "", "A": "", "P": ""}
     
-    # Find Subjective
     subj_match = re.search(r"SUBJECTIVE[:\*\s]*(.*?)(?=OBJECTIVE|ASSESSMENT|PLAN|$)", text, re.DOTALL | re.IGNORECASE)
     if subj_match: sections["S"] = subj_match.group(1).strip()
     
-    # Find Objective
     obj_match = re.search(r"OBJECTIVE[:\*\s]*(.*?)(?=SUBJECTIVE|ASSESSMENT|PLAN|$)", text, re.DOTALL | re.IGNORECASE)
     if obj_match: sections["O"] = obj_match.group(1).strip()
     
-    # Find Assessment
     assess_match = re.search(r"ASSESSMENT[:\*\s]*(.*?)(?=SUBJECTIVE|OBJECTIVE|PLAN|$)", text, re.DOTALL | re.IGNORECASE)
     if assess_match: sections["A"] = assess_match.group(1).strip()
     
-    # Find Plan
     plan_match = re.search(r"PLAN[:\*\s]*(.*?)(?=SUBJECTIVE|OBJECTIVE|ASSESSMENT|$)", text, re.DOTALL | re.IGNORECASE)
     if plan_match: sections["P"] = plan_match.group(1).strip()
     
     return sections
-
-# --- NEW BILLING CODE FUNCTION GOES HERE ---
-def generate_billing_codes(soap_text):
-    billing_prompt = """You are an expert medical coder. Analyze the following SOAP note and suggest the most likely billing codes.
-    
-    Output ONLY a markdown table with three columns:
-    | Code Type | Code | Justification |
-    |---|---|---|
-    | ICD-10 | [code] | [Why this code?] |
-    | CPT | [code] | [Why this code?] |
-    
-    If you are unsure, provide your best guess based on standard US billing guidelines. Do not output anything else."""
-    
-    response = client.chat.completions.create(
-        model="openai/gpt-oss-120b",
-        messages=[
-            {"role": "system", "content": billing_prompt},
-            {"role": "user", "content": f"Here is the SOAP note:\n\n{soap_text}"}
-        ],
-        temperature=0.1
-    )
-    return response.choices[0].message.content
 
 # --- SESSION STATE INITIALIZATION ---
 if "sections" not in st.session_state:
@@ -104,7 +78,6 @@ if st.button("⚡ Generate Note", use_container_width=True):
     else:
         with st.spinner("Processing audio and generating note..."):
             try:
-                # Convert to WAV in memory
                 try:
                     audio_array, samplerate = sf.read(io.BytesIO(audio_data))
                 except:
@@ -133,7 +106,6 @@ if st.button("⚡ Generate Note", use_container_width=True):
                 soap = response.choices[0].message.content
                 sections = parse_soap(soap)
                 
-                # Save to state and force a rerun so the UI updates cleanly
                 st.session_state.transcript = transcript
                 st.session_state.sections = sections
                 st.rerun()
@@ -145,11 +117,10 @@ if st.button("⚡ Generate Note", use_container_width=True):
 if st.session_state.sections is not None:
     s = st.session_state.sections
     
-    # Check if the AI actually found medical text
     total_words = len((s.get("S", "") + s.get("O", "") + s.get("A", "") + s.get("P", "")).split())
     
     if total_words < 3:
-        st.warning("⚠️ The AI could not find a medical conversation in this audio. It sounds like casual chat. Please upload a real doctor-patient audio file.")
+        st.warning("⚠️ The AI could not find a medical conversation in this audio. Please upload a real doctor-patient audio file.")
     else:
         st.success("Note generated successfully!")
         st.subheader("📋 Medical Note")
@@ -168,17 +139,6 @@ if st.session_state.sections is not None:
         
         note_text = f"SUBJECTIVE:\n{subj}\n\nOBJECTIVE:\n{obj}\n\nASSESSMENT:\n{assess}\n\nPLAN:\n{plan}"
         st.download_button("⬇️ Download Note", note_text, file_name="scribeo_note.txt")
-        
-        # --- NEW BILLING CODE UI ---
-        st.divider()
-        st.subheader("💰 Billing & Coding")
-        st.write("Generate suggested ICD-10 and CPT billing codes based on this note.")
-        
-        if st.button("Generate Billing Codes"):
-            with st.spinner("Coding..."):
-                full_note = f"SUBJECTIVE:\n{subj}\n\nOBJECTIVE:\n{obj}\n\nASSESSMENT:\n{assess}\n\nPLAN:\n{plan}"
-                codes = generate_billing_codes(full_note)
-                st.markdown(codes)
         
     with st.expander("📝 View Raw Transcript"):
         st.write(st.session_state.transcript)
