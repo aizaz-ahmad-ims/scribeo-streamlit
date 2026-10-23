@@ -142,7 +142,6 @@ if st.button("⚡ Generate Note", use_container_width=True):
                 st.error(f"An error occurred: {str(e)}")
 
 # --- DISPLAY RESULTS ---
-# THE FIX: We explicitly check if it is not None
 if st.session_state.sections is not None:
     s = st.session_state.sections
     
@@ -168,8 +167,8 @@ if st.session_state.sections is not None:
         plan = st.text_area("plan_key", value=s.get("P", ""), height=100, label_visibility="collapsed")
         
         note_text = f"SUBJECTIVE:\n{subj}\n\nOBJECTIVE:\n{obj}\n\nASSESSMENT:\n{assess}\n\nPLAN:\n{plan}"
-                st.download_button("⬇️ Download Note", note_text, file_name="scribeo_note.txt")
-
+        st.download_button("⬇️ Download Note", note_text, file_name="scribeo_note.txt")
+        
         # --- NEW BILLING CODE UI ---
         st.divider()
         st.subheader("💰 Billing & Coding")
@@ -177,7 +176,6 @@ if st.session_state.sections is not None:
         
         if st.button("Generate Billing Codes"):
             with st.spinner("Coding..."):
-                # Combine the edited text boxes into one string
                 full_note = f"SUBJECTIVE:\n{subj}\n\nOBJECTIVE:\n{obj}\n\nASSESSMENT:\n{assess}\n\nPLAN:\n{plan}"
                 codes = generate_billing_codes(full_note)
                 st.markdown(codes)
