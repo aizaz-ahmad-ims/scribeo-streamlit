@@ -102,13 +102,9 @@ if st.button("⚡ Generate Note", use_container_width=True):
 if "sections" in st.session_state:
     st.subheader("Medical Note")
     s = st.session_state.sections
-    st.text_area("Subjective", value=s["S"], height=150)
-    st.text_area("Objective", value=s["O"], height=150)
-    st.text_area("Assessment", value=s["A"], height=150)
-    st.text_area("Plan", value=s["P"], height=150)
     
-    note_text = f"SUBJECTIVE:\n{s['S']}\n\nOBJECTIVE:\n{s['O']}\n\nASSESSMENT:\n{s['A']}\n\nPLAN:\n{s['P']}"
-    st.download_button("⬇️ Download Note", note_text, file_name="scribeo_note.txt")
-    
-    with st.expander("Raw Transcript"):
-        st.write(st.session_state.transcript)
+    # We add 'key=' to each text area so Streamlit doesn't get confused
+    st.text_area("Subjective", value=s["S"], height=150, key="ui_subj")
+    st.text_area("Objective", value=s["O"], height=150, key="ui_obj")
+    st.text_area("Assessment", value=s["A"], height=150, key="ui_assess")
+    st.text_area("Plan", value=s["P"], height=150, key="ui_plan")
