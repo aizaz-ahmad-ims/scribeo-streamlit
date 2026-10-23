@@ -47,6 +47,12 @@ def parse_soap(text):
         elif current: sections[current] += line + "\n"
     return {k: v.strip() for k, v in sections.items()}
 
+# --- SESSION STATE INITIALIZATION ---
+if "sections" not in st.session_state:
+    st.session_state.sections = None
+if "transcript" not in st.session_state:
+    st.session_state.transcript = ""
+
 # --- UI ---
 st.title("🩺 Scribeo")
 st.write("Convert Urdu-English doctor-patient conversations into structured medical notes.")
@@ -63,48 +69,61 @@ if st.button("⚡ Generate Note", use_container_width=True):
     if audio_data is None:
         st.warning("Please upload or record audio.")
     else:
-        with st.spinner("Processing..."):
-            # Convert to WAV in memory
+        with st.spinner("Processing audio and generating note..."):
             try:
-                audio_array, samplerate = sf.read(io.BytesIO(audio_data))
-            except:
-                temp_in = "/tmp/in_audio"
-                with open(temp_in, "wb") as f: f.write(audio_data)
-                audio_array, samplerate = sf.read(temp_in)
-            
-            if len(audio_array.shape) > 1: audio_array = audio_array.mean(axis=1)
-            temp_wav = "/tmp/out.wav"
-            sf.write(temp_wav, audio_array, samplerate)
-            
-            with open(temp_wav, "rb") as f:
-                # Transcribe
-                transcription = client.audio.transcriptions.create(
-                    file=("audio.wav", f.read()),
-                    model="whisper-large-v3-turbo",
-                    language="ur",
-                    response_format="text"
+                # Convert to WAV in memory
+                try:
+                    audio_array, samplerate = sf.read(io.BytesIO(audio_data))
+                except:
+                    temp_in = "/tmp/in_audio"
+                    with open(temp_in, "wb") as f: f.write(audio_data)
+                    audio_array, samplerate = sf.read(temp_in)
+                
+                if len(audio_array.shape) > 1: audio_array = audio_array.mean(axis=1)
+                temp_wav = "/tmp/out.wav"
+                sf.write(temp_wav, audio_array, samplerate)
+                
+                with open(temp_wav, "rb") as f:
+                    transcription = client.audio.transcriptions.create(
+                        file=("audio.wav", f.read()),
+                        model="whisper-large-v3-turbo",
+                        language="ur",
+                        response_format="text"
+                    )
+                transcript = transcription if isinstance(transcription, str) else transcription.text
+                
+                response = client.chat.completions.create(
+                    model="openai/gpt-oss-120b",
+                    messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": f"Convert: {transcript}"}],
+                    temperature=0.1
                 )
-            transcript = transcription if isinstance(transcription, str) else transcription.text
-            
-            # Generate SOAP
-            response = client.chat.completions.create(
-                model="openai/gpt-oss-120b",
-                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": f"Convert: {transcript}"}],
-                temperature=0.1
-            )
-            soap = response.choices[0].message.content
-            sections = parse_soap(soap)
-            
-            st.session_state.transcript = transcript
-            st.session_state.sections = sections
-            st.success("Done!")
+                soap = response.choices[0].message.content
+                sections = parse_soap(soap)
+                
+                # Save to state and force a rerun so the UI updates cleanly
+                st.session_state.transcript = transcript
+                st.session_state.sections = sections
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
 
-if "sections" in st.session_state:
-    st.subheader("Medical Note")
+# --- DISPLAY RESULTS ---
+if st.session_state.sections is not None:
+    st.success("Note generated successfully!")
+    
+    st.subheader("📋 Medical Note")
+    st.caption("✏️ You can edit any section below before downloading.")
+    
     s = st.session_state.sections
     
-    # We add 'key=' to each text area so Streamlit doesn't get confused
-    st.text_area("Subjective", value=s["S"], height=150, key="ui_subj")
-    st.text_area("Objective", value=s["O"], height=150, key="ui_obj")
-    st.text_area("Assessment", value=s["A"], height=150, key="ui_assess")
-    st.text_area("Plan", value=s["P"], height=150, key="ui_plan")
+    st.text_area("Subjective", value=s["S"], height=150)
+    st.text_area("Objective", value=s["O"], height=150)
+    st.text_area("Assessment", value=s["A"], height=150)
+    st.text_area("Plan", value=s["P"], height=150)
+    
+    note_text = f"SUBJECTIVE:\n{s['S']}\n\nOBJECTIVE:\n{s['O']}\n\nASSESSMENT:\n{s['A']}\n\nPLAN:\n{s['P']}"
+    st.download_button("⬇️ Download Note", note_text, file_name="scribeo_note.txt")
+    
+    with st.expander("📝 View Raw Transcript"):
+        st.write(st.session_state.transcript)
