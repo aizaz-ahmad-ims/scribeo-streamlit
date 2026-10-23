@@ -117,12 +117,20 @@ if st.session_state.sections is not None:
     
     s = st.session_state.sections
     
-    st.text_area("Subjective", value=s["S"], height=150)
-    st.text_area("Objective", value=s["O"], height=150)
-    st.text_area("Assessment", value=s["A"], height=150)
-    st.text_area("Plan", value=s["P"], height=150)
+    # Using columns and markdown to force Streamlit to render it beautifully
+    st.markdown("**Subjective**")
+    subj = st.text_area("", value=s["S"], height=100, label_visibility="collapsed")
     
-    note_text = f"SUBJECTIVE:\n{s['S']}\n\nOBJECTIVE:\n{s['O']}\n\nASSESSMENT:\n{s['A']}\n\nPLAN:\n{s['P']}"
+    st.markdown("**Objective**")
+    obj = st.text_area("", value=s["O"], height=100, label_visibility="collapsed")
+    
+    st.markdown("**Assessment**")
+    assess = st.text_area("", value=s["A"], height=100, label_visibility="collapsed")
+    
+    st.markdown("**Plan**")
+    plan = st.text_area("", value=s["P"], height=100, label_visibility="collapsed")
+    
+    note_text = f"SUBJECTIVE:\n{subj}\n\nOBJECTIVE:\n{obj}\n\nASSESSMENT:\n{assess}\n\nPLAN:\n{plan}"
     st.download_button("⬇️ Download Note", note_text, file_name="scribeo_note.txt")
     
     with st.expander("📝 View Raw Transcript"):
