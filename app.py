@@ -3,6 +3,7 @@ import numpy as np
 import soundfile as sf
 import os
 import io
+import re
 from groq import Groq
 
 st.set_page_config(page_title="Scribeo", page_icon="🩺", layout="wide")
@@ -29,23 +30,33 @@ Rules:
 - Preserve all medical facts: symptoms, durations, dosages, drug names.
 - Correct obvious misspellings of drug names.
 - If a section has no information, write "Not documented."
-Format:
+Format exactly like this:
 SUBJECTIVE: ...
 OBJECTIVE: ...
 ASSESSMENT: ...
 PLAN: ..."""
 
+# --- BULLETPROOF PARSER ---
 def parse_soap(text):
     sections = {"S": "", "O": "", "A": "", "P": ""}
-    current = None
-    for line in text.split("\n"):
-        upper = line.strip().upper()
-        if upper.startswith("SUBJECTIVE"): current = "S"
-        elif upper.startswith("OBJECTIVE"): current = "O"
-        elif upper.startswith("ASSESSMENT"): current = "A"
-        elif upper.startswith("PLAN"): current = "P"
-        elif current: sections[current] += line + "\n"
-    return {k: v.strip() for k, v in sections.items()}
+    
+    # Find Subjective
+    subj_match = re.search(r"SUBJECTIVE[:\*\s]*(.*?)(?=OBJECTIVE|ASSESSMENT|PLAN|$)", text, re.DOTALL | re.IGNORECASE)
+    if subj_match: sections["S"] = subj_match.group(1).strip()
+    
+    # Find Objective
+    obj_match = re.search(r"OBJECTIVE[:\*\s]*(.*?)(?=SUBJECTIVE|ASSESSMENT|PLAN|$)", text, re.DOTALL | re.IGNORECASE)
+    if obj_match: sections["O"] = obj_match.group(1).strip()
+    
+    # Find Assessment
+    assess_match = re.search(r"ASSESSMENT[:\*\s]*(.*?)(?=SUBJECTIVE|OBJECTIVE|PLAN|$)", text, re.DOTALL | re.IGNORECASE)
+    if assess_match: sections["A"] = assess_match.group(1).strip()
+    
+    # Find Plan
+    plan_match = re.search(r"PLAN[:\*\s]*(.*?)(?=SUBJECTIVE|OBJECTIVE|ASSESSMENT|$)", text, re.DOTALL | re.IGNORECASE)
+    if plan_match: sections["P"] = plan_match.group(1).strip()
+    
+    return sections
 
 # --- SESSION STATE INITIALIZATION ---
 if "sections" not in st.session_state:
@@ -109,11 +120,12 @@ if st.button("⚡ Generate Note", use_container_width=True):
                 st.error(f"An error occurred: {str(e)}")
 
 # --- DISPLAY RESULTS ---
-if "sections" in st.session_state:
+# THE FIX: We explicitly check if it is not None
+if st.session_state.sections is not None:
     s = st.session_state.sections
     
     # Check if the AI actually found medical text
-    total_words = len((s["S"] + s["O"] + s["A"] + s["P"]).split())
+    total_words = len((s.get("S", "") + s.get("O", "") + s.get("A", "") + s.get("P", "")).split())
     
     if total_words < 3:
         st.warning("⚠️ The AI could not find a medical conversation in this audio. It sounds like casual chat. Please upload a real doctor-patient audio file.")
@@ -122,16 +134,16 @@ if "sections" in st.session_state:
         st.subheader("📋 Medical Note")
         
         st.markdown("**Subjective**")
-        subj = st.text_area("subj_key", value=s["S"], height=100, label_visibility="collapsed")
+        subj = st.text_area("subj_key", value=s.get("S", ""), height=100, label_visibility="collapsed")
         
         st.markdown("**Objective**")
-        obj = st.text_area("obj_key", value=s["O"], height=100, label_visibility="collapsed")
+        obj = st.text_area("obj_key", value=s.get("O", ""), height=100, label_visibility="collapsed")
         
         st.markdown("**Assessment**")
-        assess = st.text_area("assess_key", value=s["A"], height=100, label_visibility="collapsed")
+        assess = st.text_area("assess_key", value=s.get("A", ""), height=100, label_visibility="collapsed")
         
         st.markdown("**Plan**")
-        plan = st.text_area("plan_key", value=s["P"], height=100, label_visibility="collapsed")
+        plan = st.text_area("plan_key", value=s.get("P", ""), height=100, label_visibility="collapsed")
         
         note_text = f"SUBJECTIVE:\n{subj}\n\nOBJECTIVE:\n{obj}\n\nASSESSMENT:\n{assess}\n\nPLAN:\n{plan}"
         st.download_button("⬇️ Download Note", note_text, file_name="scribeo_note.txt")
