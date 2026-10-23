@@ -58,6 +58,28 @@ def parse_soap(text):
     
     return sections
 
+# --- NEW BILLING CODE FUNCTION GOES HERE ---
+def generate_billing_codes(soap_text):
+    billing_prompt = """You are an expert medical coder. Analyze the following SOAP note and suggest the most likely billing codes.
+    
+    Output ONLY a markdown table with three columns:
+    | Code Type | Code | Justification |
+    |---|---|---|
+    | ICD-10 | [code] | [Why this code?] |
+    | CPT | [code] | [Why this code?] |
+    
+    If you are unsure, provide your best guess based on standard US billing guidelines. Do not output anything else."""
+    
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-120b",
+        messages=[
+            {"role": "system", "content": billing_prompt},
+            {"role": "user", "content": f"Here is the SOAP note:\n\n{soap_text}"}
+        ],
+        temperature=0.1
+    )
+    return response.choices[0].message.content
+
 # --- SESSION STATE INITIALIZATION ---
 if "sections" not in st.session_state:
     st.session_state.sections = None
@@ -146,7 +168,19 @@ if st.session_state.sections is not None:
         plan = st.text_area("plan_key", value=s.get("P", ""), height=100, label_visibility="collapsed")
         
         note_text = f"SUBJECTIVE:\n{subj}\n\nOBJECTIVE:\n{obj}\n\nASSESSMENT:\n{assess}\n\nPLAN:\n{plan}"
-        st.download_button("⬇️ Download Note", note_text, file_name="scribeo_note.txt")
+                st.download_button("⬇️ Download Note", note_text, file_name="scribeo_note.txt")
+
+        # --- NEW BILLING CODE UI ---
+        st.divider()
+        st.subheader("💰 Billing & Coding")
+        st.write("Generate suggested ICD-10 and CPT billing codes based on this note.")
+        
+        if st.button("Generate Billing Codes"):
+            with st.spinner("Coding..."):
+                # Combine the edited text boxes into one string
+                full_note = f"SUBJECTIVE:\n{subj}\n\nOBJECTIVE:\n{obj}\n\nASSESSMENT:\n{assess}\n\nPLAN:\n{plan}"
+                codes = generate_billing_codes(full_note)
+                st.markdown(codes)
         
     with st.expander("📝 View Raw Transcript"):
         st.write(st.session_state.transcript)
