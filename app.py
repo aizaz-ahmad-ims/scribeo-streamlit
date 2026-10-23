@@ -23,7 +23,7 @@ def get_groq_client():
 
 client = get_groq_client()
 
-system_prompt = """You are a medical scribe assistant.
+system_prompt = """You are a medical scribe assistant and medical coder.
 Convert a doctor-patient transcript into a structured SOAP note.
 Rules:
 - Output ONLY the SOAP note.
