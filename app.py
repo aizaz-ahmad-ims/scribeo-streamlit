@@ -109,29 +109,32 @@ if st.button("⚡ Generate Note", use_container_width=True):
                 st.error(f"An error occurred: {str(e)}")
 
 # --- DISPLAY RESULTS ---
-if st.session_state.sections is not None:
-    st.success("Note generated successfully!")
-    
-    st.subheader("📋 Medical Note")
-    st.caption("✏️ You can edit any section below before downloading.")
-    
+if "sections" in st.session_state:
     s = st.session_state.sections
     
-    # Unique keys fix the DuplicateElementId error
-    st.markdown("**Subjective**")
-    subj = st.text_area("subj_box", value=s["S"], height=100, label_visibility="collapsed")
+    # Check if the AI actually found medical text
+    total_words = len((s["S"] + s["O"] + s["A"] + s["P"]).split())
     
-    st.markdown("**Objective**")
-    obj = st.text_area("obj_box", value=s["O"], height=100, label_visibility="collapsed")
-    
-    st.markdown("**Assessment**")
-    assess = st.text_area("assess_box", value=s["A"], height=100, label_visibility="collapsed")
-    
-    st.markdown("**Plan**")
-    plan = st.text_area("plan_box", value=s["P"], height=100, label_visibility="collapsed")
-    
-    note_text = f"SUBJECTIVE:\n{subj}\n\nOBJECTIVE:\n{obj}\n\nASSESSMENT:\n{assess}\n\nPLAN:\n{plan}"
-    st.download_button("⬇️ Download Note", note_text, file_name="scribeo_note.txt")
-    
+    if total_words < 3:
+        st.warning("⚠️ The AI could not find a medical conversation in this audio. It sounds like casual chat. Please upload a real doctor-patient audio file.")
+    else:
+        st.success("Note generated successfully!")
+        st.subheader("📋 Medical Note")
+        
+        st.markdown("**Subjective**")
+        subj = st.text_area("subj_key", value=s["S"], height=100, label_visibility="collapsed")
+        
+        st.markdown("**Objective**")
+        obj = st.text_area("obj_key", value=s["O"], height=100, label_visibility="collapsed")
+        
+        st.markdown("**Assessment**")
+        assess = st.text_area("assess_key", value=s["A"], height=100, label_visibility="collapsed")
+        
+        st.markdown("**Plan**")
+        plan = st.text_area("plan_key", value=s["P"], height=100, label_visibility="collapsed")
+        
+        note_text = f"SUBJECTIVE:\n{subj}\n\nOBJECTIVE:\n{obj}\n\nASSESSMENT:\n{assess}\n\nPLAN:\n{plan}"
+        st.download_button("⬇️ Download Note", note_text, file_name="scribeo_note.txt")
+        
     with st.expander("📝 View Raw Transcript"):
         st.write(st.session_state.transcript)
