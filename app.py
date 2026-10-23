@@ -68,7 +68,7 @@ col1, col2 = st.columns(2)
 with col1:
     audio_recording = st.audio_input("Record Audio")
 with col2:
-    uploaded_file = st.file_uploader("Upload Audio", type=["mp3", "wav", "m4a"])
+        uploaded_file = st.file_uploader("Upload Audio", type=["mp3", "wav", "m4a", "ogg", "flac", "aac", "wma", "opus"])
 
 if st.button("⚡ Generate Note", use_container_width=True):
     audio_data = uploaded_file.read() if uploaded_file else (audio_recording.read() if audio_recording else None)
